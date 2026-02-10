@@ -1,2 +1,9 @@
-# CSP_panel
- Cutting stock problem panel
+# Hesaplama ve Optimizasyon Paneli
+
+Bu proje, parça kesim optimizasyonu için basit bir arayüz sunar.
+
+## Özellikler
+
+- **Veri Girişi**: Parça uzunlukları ve miktarlarını girin.
+- **Otomatik Sıralama**: Her parça grubuna otomatik sıra numarası verilir.
+- **Sonuç Görüntüleme**: Hesaplama sonrası veriler listelenir ve indirilebilir.
