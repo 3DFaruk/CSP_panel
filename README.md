@@ -1,3 +1,5 @@
+https://csppanel.streamlit.app/
+
 # Hesaplama ve Optimizasyon Paneli
 
 Bu proje, parça kesim optimizasyonu için basit bir arayüz sunar.
