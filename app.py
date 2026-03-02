@@ -1,3 +1,5 @@
+import os
+import urllib.request
 import streamlit as st
 import pandas as pd
 import pulp
@@ -8,8 +10,46 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from translations import translations
 
-st.set_page_config(page_title="Hesaplama Merkezi", layout="wide")
+st.set_page_config(page_title="Hesaplama Merkezi / Calculation Center", layout="wide")
+
+@st.cache_resource
+def setup_fonts():
+    font_regular = "Roboto-Regular.ttf"
+    font_bold = "Roboto-Bold.ttf"
+    url_regular = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"
+    url_bold = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+    try:
+        if not os.path.exists(font_regular):
+            urllib.request.urlretrieve(url_regular, font_regular)
+        if not os.path.exists(font_bold):
+            urllib.request.urlretrieve(url_bold, font_bold)
+        pdfmetrics.registerFont(TTFont('Roboto', font_regular))
+        pdfmetrics.registerFont(TTFont('Roboto-Bold', font_bold))
+        return 'Roboto', 'Roboto-Bold'
+    except Exception:
+        return 'Helvetica', 'Helvetica-Bold'
+
+FONT_REGULAR, FONT_BOLD = setup_fonts()
+
+if "lang" not in st.session_state:
+    st.session_state.lang = "🇹🇷 Türkçe"
+
+def t(key, *args):
+    # Map the display name with emoji back to the key used in translations dictionary
+    lang_map = {
+        "🇹🇷 Türkçe": "Türkçe",
+        "🇬🇧 English": "English",
+        "🇷🇺 Русский": "Русский"
+    }
+    dict_key = lang_map.get(st.session_state.lang, "Türkçe")
+    text = translations[dict_key].get(key, key)
+    if args:
+        return text.format(*args)
+    return text
 
 def solve_cutting_stock_integer(data_list, raw_len):
     L = raw_len
@@ -132,11 +172,11 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
     
     y_pos = height - 20*mm
 
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width/2, height - 25*mm, "KESIM LISTESI")
+    c.setFont(FONT_BOLD, 20)
+    c.drawCentredString(width/2, height - 25*mm, t("cut_list"))
     
-    c.setFont("Helvetica", 12)
-    info_text = f"Profil Boyu: {r_len}mm | Stok: {r_qty} adet | Gereken Profil: {res1_total} adet | Fire Payi: {waste}mm"
+    c.setFont(FONT_REGULAR, 12)
+    info_text = t("profile_info_pdf", r_len, r_qty, res1_total, waste)
     c.drawCentredString(width/2, height - 32*mm, info_text)
     
     c.setStrokeColor(colors.grey)
@@ -161,12 +201,12 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
             
         cb_y = y_pos + bar_height + 2*mm
         
-        title_text = f"{count} Adet Profil:"
+        title_text = t("profile_count", count)
         c.setFillColor(colors.black)
-        c.setFont("Helvetica-Bold", 12)
+        c.setFont(FONT_BOLD, 12)
         c.drawString(15*mm, cb_y + 1*mm, title_text)
         
-        text_width = c.stringWidth(title_text, "Helvetica-Bold", 12)
+        text_width = c.stringWidth(title_text, FONT_BOLD, 12)
         start_cb_x = 15*mm + text_width + 2*mm
         cb_size = 4*mm
         gap = 2*mm
@@ -186,8 +226,8 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
             if checkbox_rows > 2:
                 remaining = count - drawn_cb_count
                 c.setFillColor(colors.black)
-                c.setFont("Helvetica-Bold", 10)
-                c.drawString(width - 18.5*mm, cb_y - cb_size - gap, f"+{remaining} ADET")
+                c.setFont(FONT_BOLD, 10)
+                c.drawString(width - 18.5*mm, cb_y - cb_size - gap, t("plus_remaining", remaining))
                 break
             
             c.rect(start_cb_x, cb_y, cb_size, cb_size, fill=1, stroke=1)
@@ -216,11 +256,11 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
                         c.rect(current_x, y_pos, part_w, bar_height, fill=1)
                         
                         if part_w > 12*mm:
-                            c.setFont("Helvetica-Bold", 14)
+                            c.setFont(FONT_BOLD, 14)
                         elif part_w > 7*mm:
-                            c.setFont("Helvetica-Bold", 10)
+                            c.setFont(FONT_BOLD, 10)
                         else:
-                            c.setFont("Helvetica-Bold", 9)
+                            c.setFont(FONT_BOLD, 9)
 
                         c.setFillColor(colors.black)
                         text_x = current_x + (part_w / 2)
@@ -252,8 +292,8 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
                 c.setDash([])
                 
                 c.setFillColor(colors.black)
-                c.setFont("Helvetica-Oblique", 8)
-                c.drawString(current_x + 1.5*mm, y_pos + bar_height + 2*mm, f"Fire: {waste_val}")
+                c.setFont(FONT_REGULAR, 8)
+                c.drawString(current_x + 1.5*mm, y_pos + bar_height + 2*mm, t("waste_pdf", waste_val))
 
         y_pos -= 25*mm
     
@@ -261,40 +301,46 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
     buffer.seek(0)
     return buffer
 
-st.title("📊 Hesaplama ve Optimizasyon Paneli")
+col_title, col_lang = st.columns([5, 1])
+
+with col_title:
+    st.title(t("main_title"))
+with col_lang:
+    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+    st.selectbox("Dil", options=["🇹🇷 Türkçe", "🇬🇧 English", "🇷🇺 Русский"], key="lang", label_visibility="collapsed")
 
 main_col1, main_col2 = st.columns(2)
 
-@st.dialog("Emin misiniz?")
+@st.dialog(t("are_you_sure"))
 def clear_table_dialog():
-    st.write("Tüm liste silinecek. Bu işlem geri alınamaz.")
+    st.write(t("clear_warning"))
     col_d1, col_d2 = st.columns(2)
     with col_d1:
-        if st.button("Evet, Sil", type="primary", width='stretch'):
+        if st.button(t("yes_clear"), type="primary", width='stretch'):
             st.session_state.df = pd.DataFrame([{"Uzunluk": 0, "Adet": 0}])
             st.session_state.run_calculation = False
             st.rerun()
     with col_d2:
-        if st.button("İptal", width='stretch'):
+        if st.button(t("cancel"), width='stretch'):
             st.rerun()
 
 def reset_calculation():
     st.session_state.run_calculation = False
 
 with main_col1:
-    st.subheader("Kesilecek Parçalar")
+    st.subheader(t("parts_to_cut"))
 
     if "df" not in st.session_state:
         st.session_state.df = pd.DataFrame([])
 
-    with st.expander("Dosya İşlemleri (İçe/Dışa Aktar)"):
+    with st.expander(t("file_ops")):
         d_col1, d_col2 = st.columns(2)
         
         with d_col1:
-            st.info("💡 **Dışa Aktar**")
+            st.info(t("export"))
             csv = st.session_state.df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="CSV Olarak İndir",
+                label=t("download_csv"),
                 data=csv,
                 file_name='kesim_listesi.csv',
                 mime='text/csv',
@@ -306,7 +352,7 @@ with main_col1:
                 st.session_state.df.to_excel(writer, index=False, sheet_name='Kesim Listesi')
             
             st.download_button(
-                label="Excel Olarak İndir",
+                label=t("download_excel"),
                 data=buffer.getvalue(),
                 file_name='kesim_listesi.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -314,8 +360,8 @@ with main_col1:
             )
 
         with d_col2:
-            st.info("📥 **İçe Aktar**")
-            uploaded_file = st.file_uploader("Dosya Yükle (CSV/Excel)", type=['csv', 'xlsx'])
+            st.info(t("import"))
+            uploaded_file = st.file_uploader(t("upload_file"), type=['csv', 'xlsx'])
             if uploaded_file is not None:
                 try:
                     if uploaded_file.name.endswith('.csv'):
@@ -325,15 +371,15 @@ with main_col1:
                     
                     required_cols = ['Uzunluk', 'Adet']
                     if all(col in df_new.columns for col in required_cols):
-                        if st.button("Verileri Tabloya Yükle"):
+                        if st.button(t("load_data")):
                             st.session_state.df = df_new[required_cols]
                             st.session_state.run_calculation = False
-                            st.success("Veriler başarıyla yüklendi!")
+                            st.success(t("data_loaded"))
                             st.rerun()
                     else:
-                        st.error(f"Dosyada şu sütunlar olmalı: {', '.join(required_cols)}")
+                        st.error(f"{t('missing_cols')} {', '.join(required_cols)}")
                 except Exception as e:
-                    st.error(f"Hata: {e}")
+                    st.error(f"{t('error')} {e}")
 
     def add_item():
         new_len = st.session_state.get("add_len", 0)
@@ -346,22 +392,22 @@ with main_col1:
         
     col_add1, col_add2, col_add3 = st.columns([2, 2, 1])
     with col_add1:
-        st.number_input("Parça Uzunluğu (mm)", min_value=10, key="add_len")
+        st.number_input(t("part_len"), min_value=10, key="add_len")
     with col_add2:
-        st.number_input("Adet", min_value=1, value=1, key="add_qty")
+        st.number_input(t("qty"), min_value=1, value=1, key="add_qty")
     with col_add3:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        st.button("Ekle", on_click=add_item, width='stretch')
+        st.button(t("add"), on_click=add_item, width='stretch')
 
     column_config = {
         "Uzunluk": st.column_config.NumberColumn(
-            label="Uzunluk (mm)",
+            label=t("len_col"),
             min_value=10, 
             format="%d",
             width="medium"
         ),
         "Adet": st.column_config.NumberColumn(
-            label="Adet",
+            label=t("qty_col"),
             min_value=1, 
             format="%d",
             width="medium"
@@ -387,43 +433,43 @@ with main_col1:
     if not edited_df.empty:
         total_pieces = edited_df["Adet"].sum()
         total_types = len(edited_df)
-        st.info(f"Toplam Parça Sayısı: **{total_pieces}** | Farklı Parça Türü: **{total_types}**")
+        st.info(t("total_info", total_pieces, total_types))
 
     if total_pieces > 0:
         col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 1])
         with col_btn1:
-            if st.button("Hızlı Hesapla (First Fit)", type="primary", width='stretch'):
+            if st.button(t("quick_calc"), type="primary", width='stretch'):
                 st.session_state.run_calculation = True
                 st.session_state.run_advanced = False
         with col_btn2:
-            if st.button("Gelişmiş Optimizasyon", type="secondary", width='stretch'):
+            if st.button(t("adv_calc"), type="secondary", width='stretch'):
                 st.session_state.run_calculation = True
                 st.session_state.run_advanced = True
     else:
-        st.warning("⚠️ Lütfen listeye en az bir parça ekleyiniz.")
+        st.warning(t("empty_warning"))
         col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 1])
         with col_btn1:
-           st.button("Hızlı Hesapla", type="primary", width='stretch', disabled=True)
+           st.button(t("quick_calc_short"), type="primary", width='stretch', disabled=True)
         with col_btn2:
-           st.button("Gelişmiş Optimizasyon", type="secondary", width='stretch', disabled=True)
+           st.button(t("adv_calc"), type="secondary", width='stretch', disabled=True)
     
     with col_btn3:
-        if st.button("Tabloyu Temizle", type="secondary", width='stretch'):
+        if st.button(t("clear_table"), type="secondary", width='stretch'):
             clear_table_dialog()
 
 with main_col2:
-    st.subheader("Profil Bilgileri")
+    st.subheader(t("profile_details"))
     input_col1, input_col2, input_col3 = st.columns(3)
     with input_col1:
-        raw_length = st.number_input("Profil Uzunluğu (mm)", min_value=10, value=6000, on_change=reset_calculation)
+        raw_length = st.number_input(t("profile_len"), min_value=10, value=6000, on_change=reset_calculation)
     with input_col2:
-        raw_qty = st.number_input("Profil Adedi", min_value=1, value=100, on_change=reset_calculation)
+        raw_qty = st.number_input(t("profile_qty"), min_value=1, value=100, on_change=reset_calculation)
     with input_col3:
-        waste_limit = st.number_input("Kesim Fire Payı (mm)", min_value=0, value=0, on_change=reset_calculation)
+        waste_limit = st.number_input(t("waste_limit"), min_value=0, value=0, on_change=reset_calculation)
     
     st.divider()
 
-    st.subheader("Sonuçlar")
+    st.subheader(t("results"))
     if st.session_state.get("run_calculation"):
         start_time = time.time()
         
@@ -438,7 +484,7 @@ with main_col2:
         parca_listesi.sort(key=lambda x: x[0], reverse=True)
 
         if parca_listesi == []:
-            st.error("Lütfen parça listesi oluşturun.")
+            st.error(t("empty_list"))
             st.stop()
 
         eff_len = raw_length - waste_limit
@@ -466,53 +512,53 @@ with main_col2:
             col_cmp1, col_cmp2 = st.columns(2)
             
             with col_cmp1:
-                st.info("###### 1. Yöntem: Gelişmiş Optimizasyon (Pulp)")
-                st.metric("Gereken Profil", f"{res1_total} Adet", delta=None)
-                st.metric("Fire Oranı", f"%{waste1_p:.2f}", delta_color="inverse")
-                st.caption(f"Hesaplama Süresi: {d1:.4f} sn")
+                st.info(t("method_1"))
+                st.metric(t("req_profile"), f"{res1_total} Adet", delta=None)
+                st.metric(t("waste_rate"), f"%{waste1_p:.2f}", delta_color="inverse")
+                st.caption(t("calc_time", d1))
                 
-                with st.expander("Detaylar (Yöntem 1)", expanded=True):
+                with st.expander(t("details_m1"), expanded=True):
                     df_res1 = pd.DataFrame(res1_details)
                     if not df_res1.empty:
                         df_res1['Fire (mm)'] = df_res1['waste']
                         st.dataframe(
                             df_res1[['count', 'pattern_str', 'Fire (mm)']].rename(
-                                columns={'count': 'Adet', 'pattern_str': 'Kesim Şablonu'}
+                                columns={'count': t("qty"), 'pattern_str': t("cut_template"), 'Fire (mm)': t("waste_mm")}
                             ),
                             width='stretch',
                             hide_index=True
                         )
 
             with col_cmp2:
-                st.warning("###### 2. Yöntem: Hızlı Yerleştirme (First Fit)")
-                st.metric("Gereken Profil", f"{res2_total} Adet", delta=f"{res2_total - res1_total} Fark" if res2_total != res1_total else "Eşit", delta_color="inverse")
-                st.metric("Fire Oranı", f"%{waste2_p:.2f}", delta=f"{waste2_p - waste1_p:.2f}% Fark" if waste2_p != waste1_p else None, delta_color="inverse")
-                st.caption(f"Hesaplama Süresi: {d2:.4f} sn")
+                st.warning(t("method_2"))
+                st.metric(t("req_profile"), f"{res2_total} Adet", delta=f"{res2_total - res1_total} " + t("diff") if res2_total != res1_total else t("equal"), delta_color="inverse")
+                st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=f"{waste2_p - waste1_p:.2f}% " + t("diff") if waste2_p != waste1_p else None, delta_color="inverse")
+                st.caption(t("calc_time", d2))
 
-                with st.expander("Detaylar (Yöntem 2)"):
+                with st.expander(t("details_m2")):
                     df_res2 = pd.DataFrame(res2_details)
                     if not df_res2.empty:
                         df_res2['Fire (mm)'] = df_res2['waste']
                         st.dataframe(
                             df_res2[['count', 'pattern_str', 'Fire (mm)']].rename(
-                                columns={'count': 'Adet', 'pattern_str': 'Kesim Şablonu'}
+                                columns={'count': t("qty"), 'pattern_str': t("cut_template"), 'Fire (mm)': t("waste_mm")}
                             ),
                             width='stretch',
                             hide_index=True
                         )
         else:
-            st.warning("###### Hızlı Yerleştirme (First Fit)")
-            st.metric("Gereken Profil", f"{res2_total} Adet", delta=None)
-            st.metric("Fire Oranı", f"%{waste2_p:.2f}", delta=None, delta_color="inverse")
-            st.caption(f"Hesaplama Süresi: {d2:.4f} sn")
+            st.warning(t("method_quick"))
+            st.metric(t("req_profile"), f"{res2_total} Adet", delta=None)
+            st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=None, delta_color="inverse")
+            st.caption(t("calc_time", d2))
 
-            with st.expander("Detaylar (Hızlı Yerleştirme)", expanded=True):
+            with st.expander(t("details_quick"), expanded=True):
                 df_res2 = pd.DataFrame(res2_details)
                 if not df_res2.empty:
                     df_res2['Fire (mm)'] = df_res2['waste']
                     st.dataframe(
                         df_res2[['count', 'pattern_str', 'Fire (mm)']].rename(
-                            columns={'count': 'Adet', 'pattern_str': 'Kesim Şablonu'}
+                            columns={'count': t("qty"), 'pattern_str': t("cut_template"), 'Fire (mm)': t("waste_mm")}
                         ),
                         width='stretch',
                         hide_index=True
@@ -521,9 +567,9 @@ with main_col2:
         end_time = time.time()
         duration = end_time - start_time
         
-        st.success(f"Hesaplama tamamlandı! (Süre: {duration:.4f} saniye)")
+        st.success(t("calc_done", duration))
         
-        st.info(f"Kullanılan Profil: {raw_length} mm | Stok: {raw_qty} adet | Fire Payı: {waste_limit} mm")
+        st.info(t("used_prof_info", raw_length, raw_qty, waste_limit))
 
         if run_advanced:
             p_col1, p_col2 = st.columns(2)
@@ -531,7 +577,7 @@ with main_col2:
             with p_col1:
                 pdf_buffer_1 = create_visual_pdf(res1_details, raw_length, raw_qty, waste_limit, res1_total)
                 st.download_button(
-                    label="📄 Yöntem 1 (Optimal) PDF İndir",
+                    label=t("pdf_m1"),
                     data=pdf_buffer_1,
                     file_name="kesim_plani_yontem1.pdf",
                     mime="application/pdf",
@@ -542,7 +588,7 @@ with main_col2:
             with p_col2:
                 pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total)
                 st.download_button(
-                    label="📄 Yöntem 2 (Hızlı) PDF İndir",
+                    label=t("pdf_m2"),
                     data=pdf_buffer_2,
                     file_name="kesim_plani_yontem2.pdf",
                     mime="application/pdf",
@@ -552,7 +598,7 @@ with main_col2:
         else:
             pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total)
             st.download_button(
-                label="📄 Hızlı Yerleştirme PDF İndir",
+                label=t("pdf_quick"),
                 data=pdf_buffer_2,
                 file_name="kesim_plani_hizli.pdf",
                 mime="application/pdf",
