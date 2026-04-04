@@ -55,6 +55,7 @@ def solve_cutting_stock_integer(data_list, raw_len):
     L = raw_len
     item_lengths = [item[0] for item in data_list]
     demands = [item[1] for item in data_list]
+    descriptions = [item[2] if len(item) > 2 else "" for item in data_list]
     
     patterns = []
     for i in range(len(item_lengths)):
@@ -111,7 +112,8 @@ def solve_cutting_stock_integer(data_list, raw_len):
             pat_len = 0
             for idx, val in enumerate(patterns[j]):
                 if val > 0:
-                    pat_desc.append(f"{val}x {item_lengths[idx]}mm")
+                    desc_str = f" ({descriptions[idx]})" if descriptions[idx] else ""
+                    pat_desc.append(f"{val}x {item_lengths[idx]}mm{desc_str}")
                     pat_len += val * item_lengths[idx]
             
             details.append({
@@ -125,36 +127,39 @@ def solve_cutting_stock_integer(data_list, raw_len):
 
 def solve_first_fit_decreasing(data_list, raw_len):
     all_items = []
-    for l, d in data_list:
-        all_items.extend([l] * d)
+    for item in data_list:
+        l = item[0]
+        d = item[1]
+        desc = item[2] if len(item) > 2 else ""
+        all_items.extend([(l, desc)] * d)
     
-    all_items.sort(reverse=True)
+    all_items.sort(key=lambda x: x[0], reverse=True)
     
     bins = [] 
     
     for item in all_items:
         placed = False
         for b in bins:
-            if b['remaining'] >= item:
-                b['remaining'] -= item
+            if b['remaining'] >= item[0]:
+                b['remaining'] -= item[0]
                 b['items'].append(item)
                 placed = True
                 break
         
         if not placed:
             bins.append({
-                'remaining': raw_len - item,
+                'remaining': raw_len - item[0],
                 'items': [item]
             })
     
-    bin_contents = [tuple(sorted(b['items'], reverse=True)) for b in bins]
+    bin_contents = [tuple(sorted(b['items'], key=lambda x: x[0], reverse=True)) for b in bins]
     bin_counts = Counter(bin_contents)
     
     details = []
     for content, count in bin_counts.items():
         item_counts = Counter(content)
-        pat_desc = [f"{c}x {l}mm" for l, c in item_counts.items()]
-        used_len = sum(content)
+        pat_desc = [f"{c}x {l}mm ({desc})" if desc else f"{c}x {l}mm" for ((l, desc), c) in item_counts.items()]
+        used_len = sum([x[0] for x in content])
         
         details.append({
             "count": count,
@@ -176,7 +181,7 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
     c.drawCentredString(width/2, height - 25*mm, t("cut_list"))
     
     c.setFont(FONT_REGULAR, 12)
-    info_text = t("profile_info_pdf", f"{r_len:g}", r_qty, res1_total, f"{waste:g}")
+    info_text = t("profile_info_pdf", r_len, r_qty, res1_total, waste)
     c.drawCentredString(width/2, height - 32*mm, info_text)
     
     c.setStrokeColor(colors.grey)
@@ -240,13 +245,21 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
         
         current_x = 15*mm
         
+        import re
         if pattern_str:
             parts = pattern_str.split(' + ')
             for p in parts:
                 try:
-                    adet_part, boy_part = p.split('x ')
-                    p_count = int(adet_part)
-                    p_len = float(boy_part.replace('mm', ''))
+                    m = re.match(r"(\d+)x\s+(\d+)mm(?:\s*\((.*?)\))?", p)
+                    if m:
+                        p_count = int(m.group(1))
+                        p_len = int(m.group(2))
+                        p_desc = m.group(3) or ""
+                    else:
+                        adet_part, boy_part = p.split('x ')
+                        p_count = int(adet_part)
+                        p_len = int(boy_part.replace('mm', ''))
+                        p_desc = ""
                     
                     for _ in range(p_count):
                         part_w = p_len * scale_factor
@@ -267,16 +280,28 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
 
                         if part_w > 5*mm:
                             text_y = y_pos + (bar_height / 2) - 1.5*mm 
+                            if p_desc and part_w > 12*mm:
+                                c.drawCentredString(text_x, text_y + 1.5*mm, str(p_len))
+                                c.setFont(FONT_REGULAR, 7)
+                                
+                                max_chars = int(part_w / (1.6 * mm))
+                                display_desc = p_desc
+                                if len(p_desc) > max_chars:
+                                    display_desc = p_desc[:max_chars] + ".."
+                                    
+                                c.drawCentredString(text_x, text_y - 2.5*mm, display_desc)
+                            else:
+                                c.drawCentredString(text_x, text_y, str(p_len))
                         else:
                             if small_text_toggle%2 == 0:
                                 text_y = y_pos + (bar_height / 2) - 9*mm
                             else:
                                 text_y = y_pos + (bar_height / 2) + 6.1*mm
                             small_text_toggle += 1
+                            c.drawCentredString(text_x, text_y, str(p_len))
                         
-                        c.drawCentredString(text_x, text_y, f"{p_len:g}")
                         current_x += part_w
-                except:
+                except Exception as e:
                     pass
                     
         if waste_val > 0:
@@ -293,7 +318,7 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
                 
                 c.setFillColor(colors.black)
                 c.setFont(FONT_REGULAR, 8)
-                c.drawString(current_x + 1.5*mm, y_pos + bar_height + 2*mm, t("waste_pdf", f"{waste_val:g}"))
+                c.drawString(current_x + 1.5*mm, y_pos + bar_height + 2*mm, t("waste_pdf", waste_val))
 
         y_pos -= 25*mm
     
@@ -317,7 +342,7 @@ def clear_table_dialog():
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         if st.button(t("yes_clear"), type="primary", width='stretch'):
-            st.session_state.df = pd.DataFrame([{"Uzunluk": 0.0, "Adet": 0}])
+            st.session_state.df = pd.DataFrame([{"Uzunluk": 0, "Adet": 0, "Açıklama": ""}])
             st.session_state.run_calculation = False
             st.rerun()
     with col_d2:
@@ -372,7 +397,10 @@ with main_col1:
                     required_cols = ['Uzunluk', 'Adet']
                     if all(col in df_new.columns for col in required_cols):
                         if st.button(t("load_data")):
-                            st.session_state.df = df_new[required_cols]
+                            if 'Açıklama' not in df_new.columns:
+                                df_new['Açıklama'] = ""
+                            df_new['Açıklama'] = df_new['Açıklama'].fillna("").astype(str)
+                            st.session_state.df = df_new[['Uzunluk', 'Adet', 'Açıklama']]
                             st.session_state.run_calculation = False
                             st.success(t("data_loaded"))
                             st.rerun()
@@ -381,20 +409,25 @@ with main_col1:
                 except Exception as e:
                     st.error(f"{t('error')} {e}")
 
+    col_desc_label = "Açıklama" if st.session_state.lang == "🇹🇷 Türkçe" else "Description" if st.session_state.lang == "🇬🇧 English" else "Описание"
+
     def add_item():
-        new_len = st.session_state.get("add_len", 0.0)
+        new_len = st.session_state.get("add_len", 0)
         new_qty = st.session_state.get("add_qty", 0)
+        new_desc = st.session_state.get("add_desc", "")
         
         if new_len > 0 and new_qty > 0:
-            new_row = pd.DataFrame([{"Uzunluk": new_len, "Adet": new_qty}])
+            new_row = pd.DataFrame([{"Uzunluk": new_len, "Adet": new_qty, "Açıklama": new_desc}])
             st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
             st.session_state.run_calculation = False
         
-    col_add1, col_add2, col_add3 = st.columns([2, 2, 1])
+    col_add1, col_add2, col_add4, col_add3 = st.columns([2, 2, 3, 1])
     with col_add1:
-        st.number_input(t("part_len"), min_value=10.0, step=0.1, format="%.1f", key="add_len")
+        st.number_input(t("part_len"), min_value=10, key="add_len")
     with col_add2:
         st.number_input(t("qty"), min_value=1, value=1, key="add_qty")
+    with col_add4:
+        st.text_input(col_desc_label, key="add_desc")
     with col_add3:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         st.button(t("add"), on_click=add_item, width='stretch')
@@ -402,9 +435,8 @@ with main_col1:
     column_config = {
         "Uzunluk": st.column_config.NumberColumn(
             label=t("len_col"),
-            min_value=10.0, 
-            step=0.1,
-            format="%.1f",
+            min_value=10, 
+            format="%d",
             width="medium"
         ),
         "Adet": st.column_config.NumberColumn(
@@ -412,6 +444,10 @@ with main_col1:
             min_value=1, 
             format="%d",
             width="medium"
+        ),
+        "Açıklama": st.column_config.TextColumn(
+            label=col_desc_label,
+            width="large"
         ),
     }
 
@@ -462,11 +498,11 @@ with main_col2:
     st.subheader(t("profile_details"))
     input_col1, input_col2, input_col3 = st.columns(3)
     with input_col1:
-        raw_length = st.number_input(t("profile_len"), min_value=10.0, value=6000.0, step=0.1, format="%.1f", on_change=reset_calculation)
+        raw_length = st.number_input(t("profile_len"), min_value=10, value=6000, on_change=reset_calculation)
     with input_col2:
         raw_qty = st.number_input(t("profile_qty"), min_value=1, value=100, on_change=reset_calculation)
     with input_col3:
-        waste_limit = st.number_input(t("waste_limit"), min_value=0.0, value=0.0, step=0.1, format="%.1f", on_change=reset_calculation)
+        waste_limit = st.number_input(t("waste_limit"), min_value=0, value=0, on_change=reset_calculation)
     
     st.divider()
 
@@ -477,10 +513,15 @@ with main_col2:
         parca_listesi = []
         for index, row in edited_df.iterrows():
             if row['Uzunluk'] and row['Adet']:
-                uzunluk = int(round(float(row['Uzunluk']) * 100))
+                uzunluk = int(row['Uzunluk'])
                 adet = int(row['Adet'])
+                
+                aciklama = str(row.get('Açıklama', '')).strip()
+                if aciklama == 'nan': aciklama = ""
+                # prevent pattern split break
+                aciklama = aciklama.replace('+', '-').replace('x ', '* ')
 
-                parca_listesi.append([uzunluk,adet])
+                parca_listesi.append([uzunluk, adet, aciklama])
         
         parca_listesi.sort(key=lambda x: x[0], reverse=True)
 
@@ -488,30 +529,11 @@ with main_col2:
             st.error(t("empty_list"))
             st.stop()
 
-        eff_len = int(round((float(raw_length) - float(waste_limit)) * 100))
+        eff_len = raw_length - waste_limit
         total_needed_len = sum(p[0] * p[1] for p in parca_listesi)
         
         t2 = time.time()
         res2_total, res2_details = solve_first_fit_decreasing(parca_listesi, eff_len)
-        
-        def unscale_details(details_list):
-            for item in details_list:
-                item['waste'] = item['waste'] / 100.0
-                item['used_len'] = item['used_len'] / 100.0
-                if 'pattern_str' in item and item['pattern_str']:
-                    parts = item['pattern_str'].split(' + ')
-                    new_parts = []
-                    for pp in parts:
-                        try:
-                            adet_str, boy_str = pp.split('x ')
-                            boy_val = int(boy_str.replace('mm', '')) / 100.0
-                            new_parts.append(f"{adet_str}x {boy_val:g}mm")
-                        except:
-                            new_parts.append(pp)
-                    item['pattern_str'] = " + ".join(new_parts)
-            return details_list
-            
-        res2_details = unscale_details(res2_details)
         d2 = time.time() - t2
         
         used2 = res2_total * eff_len
@@ -523,7 +545,6 @@ with main_col2:
         if run_advanced:
             t1 = time.time()
             res1_total, res1_details = solve_cutting_stock_integer(parca_listesi, eff_len)
-            res1_details = unscale_details(res1_details)
             d1 = time.time() - t1
             
             used1 = res1_total * eff_len
@@ -535,7 +556,7 @@ with main_col2:
             with col_cmp1:
                 st.info(t("method_1"))
                 st.metric(t("req_profile"), f"{res1_total} Adet", delta=None)
-                st.metric(t("waste_rate"), f"%{waste1_p:.1f}", delta_color="inverse")
+                st.metric(t("waste_rate"), f"%{waste1_p:.2f}", delta_color="inverse")
                 st.caption(t("calc_time", d1))
                 
                 with st.expander(t("details_m1"), expanded=True):
@@ -553,7 +574,7 @@ with main_col2:
             with col_cmp2:
                 st.warning(t("method_2"))
                 st.metric(t("req_profile"), f"{res2_total} Adet", delta=f"{res2_total - res1_total} " + t("diff") if res2_total != res1_total else t("equal"), delta_color="inverse")
-                st.metric(t("waste_rate"), f"%{waste2_p:.1f}", delta=f"{waste2_p - waste1_p:.1f}% " + t("diff") if waste2_p != waste1_p else None, delta_color="inverse")
+                st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=f"{waste2_p - waste1_p:.2f}% " + t("diff") if waste2_p != waste1_p else None, delta_color="inverse")
                 st.caption(t("calc_time", d2))
 
                 with st.expander(t("details_m2")):
@@ -570,7 +591,7 @@ with main_col2:
         else:
             st.warning(t("method_quick"))
             st.metric(t("req_profile"), f"{res2_total} Adet", delta=None)
-            st.metric(t("waste_rate"), f"%{waste2_p:.1f}", delta=None, delta_color="inverse")
+            st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=None, delta_color="inverse")
             st.caption(t("calc_time", d2))
 
             with st.expander(t("details_quick"), expanded=True):
@@ -590,7 +611,7 @@ with main_col2:
         
         st.success(t("calc_done", duration))
         
-        st.info(t("used_prof_info", f"{raw_length:g}", raw_qty, f"{waste_limit:g}"))
+        st.info(t("used_prof_info", raw_length, raw_qty, waste_limit))
 
         if run_advanced:
             p_col1, p_col2 = st.columns(2)
