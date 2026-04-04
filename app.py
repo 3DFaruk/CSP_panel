@@ -452,7 +452,7 @@ with main_col1:
                 except Exception as e:
                     st.error(f"{t('error')} {e}")
 
-    col_desc_label = "Açıklama" if st.session_state.lang == "🇹🇷 Türkçe" else "Description" if st.session_state.lang == "🇬🇧 English" else "Описание"
+
 
     def add_item():
         new_len = st.session_state.get("add_len", 0)
@@ -470,7 +470,7 @@ with main_col1:
     with col_add2:
         st.number_input(t("qty"), min_value=1, value=1, key="add_qty")
     with col_add4:
-        st.text_input(col_desc_label, key="add_desc")
+        st.text_input(t("desc_col"), key="add_desc")
     with col_add3:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         st.button(t("add"), on_click=add_item, width='stretch')
@@ -489,7 +489,7 @@ with main_col1:
             width="medium"
         ),
         "Açıklama": st.column_config.TextColumn(
-            label=col_desc_label,
+            label=t("desc_col"),
             width="large"
         ),
     }
@@ -539,8 +539,7 @@ with main_col1:
 
 with main_col2:
     st.subheader(t("profile_details"))
-    col_proj_label = "Kesim / Profil Başlığı" if st.session_state.lang == "🇹🇷 Türkçe" else ("Cut / Profile Title" if st.session_state.lang == "🇬🇧 English" else "Название профиля")
-    project_title = st.text_input(col_proj_label, key="project_title", on_change=reset_calculation)
+    project_title = st.text_input(t("proj_title_label"), key="project_title", on_change=reset_calculation)
     st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
     input_col1, input_col3 = st.columns(2)
