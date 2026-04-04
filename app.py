@@ -392,7 +392,7 @@ with main_col1:
         
     col_add1, col_add2, col_add3 = st.columns([2, 2, 1])
     with col_add1:
-        st.number_input(t("part_len"), min_value=10.0, step=0.1, format="%.2f", key="add_len")
+        st.number_input(t("part_len"), min_value=10.0, step=0.1, format="%.1f", key="add_len")
     with col_add2:
         st.number_input(t("qty"), min_value=1, value=1, key="add_qty")
     with col_add3:
@@ -404,7 +404,7 @@ with main_col1:
             label=t("len_col"),
             min_value=10.0, 
             step=0.1,
-            format="%.2f",
+            format="%.1f",
             width="medium"
         ),
         "Adet": st.column_config.NumberColumn(
@@ -462,11 +462,11 @@ with main_col2:
     st.subheader(t("profile_details"))
     input_col1, input_col2, input_col3 = st.columns(3)
     with input_col1:
-        raw_length = st.number_input(t("profile_len"), min_value=10.0, value=6000.0, step=0.1, format="%.2f", on_change=reset_calculation)
+        raw_length = st.number_input(t("profile_len"), min_value=10.0, value=6000.0, step=0.1, format="%.1f", on_change=reset_calculation)
     with input_col2:
         raw_qty = st.number_input(t("profile_qty"), min_value=1, value=100, on_change=reset_calculation)
     with input_col3:
-        waste_limit = st.number_input(t("waste_limit"), min_value=0.0, value=0.0, step=0.1, format="%.2f", on_change=reset_calculation)
+        waste_limit = st.number_input(t("waste_limit"), min_value=0.0, value=0.0, step=0.1, format="%.1f", on_change=reset_calculation)
     
     st.divider()
 
@@ -535,7 +535,7 @@ with main_col2:
             with col_cmp1:
                 st.info(t("method_1"))
                 st.metric(t("req_profile"), f"{res1_total} Adet", delta=None)
-                st.metric(t("waste_rate"), f"%{waste1_p:.2f}", delta_color="inverse")
+                st.metric(t("waste_rate"), f"%{waste1_p:.1f}", delta_color="inverse")
                 st.caption(t("calc_time", d1))
                 
                 with st.expander(t("details_m1"), expanded=True):
@@ -553,7 +553,7 @@ with main_col2:
             with col_cmp2:
                 st.warning(t("method_2"))
                 st.metric(t("req_profile"), f"{res2_total} Adet", delta=f"{res2_total - res1_total} " + t("diff") if res2_total != res1_total else t("equal"), delta_color="inverse")
-                st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=f"{waste2_p - waste1_p:.2f}% " + t("diff") if waste2_p != waste1_p else None, delta_color="inverse")
+                st.metric(t("waste_rate"), f"%{waste2_p:.1f}", delta=f"{waste2_p - waste1_p:.1f}% " + t("diff") if waste2_p != waste1_p else None, delta_color="inverse")
                 st.caption(t("calc_time", d2))
 
                 with st.expander(t("details_m2")):
@@ -570,7 +570,7 @@ with main_col2:
         else:
             st.warning(t("method_quick"))
             st.metric(t("req_profile"), f"{res2_total} Adet", delta=None)
-            st.metric(t("waste_rate"), f"%{waste2_p:.2f}", delta=None, delta_color="inverse")
+            st.metric(t("waste_rate"), f"%{waste2_p:.1f}", delta=None, delta_color="inverse")
             st.caption(t("calc_time", d2))
 
             with st.expander(t("details_quick"), expanded=True):
