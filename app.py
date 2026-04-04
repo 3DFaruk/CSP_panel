@@ -174,7 +174,7 @@ def solve_first_fit_decreasing(data_list, raw_len, kerf=0):
         
     return len(bins), details
 
-def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
+def create_visual_pdf(details, r_len, r_qty, waste, res1_total, project_title=""):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -182,7 +182,10 @@ def create_visual_pdf(details, r_len, r_qty, waste, res1_total):
     y_pos = height - 20*mm
 
     c.setFont(FONT_BOLD, 20)
-    c.drawCentredString(width/2, height - 25*mm, t("cut_list"))
+    title_text = t("cut_list")
+    if project_title:
+        title_text += f" - {project_title}"
+    c.drawCentredString(width/2, height - 25*mm, title_text)
     
     c.setFont(FONT_REGULAR, 12)
     info_text = t("profile_info_pdf", r_len, r_qty, res1_total, waste)
@@ -500,6 +503,10 @@ with main_col1:
 
 with main_col2:
     st.subheader(t("profile_details"))
+    col_proj_label = "Kesim / Profil Başlığı (Örn: F60.208)" if st.session_state.lang == "🇹🇷 Türkçe" else ("Cut / Profile Title (e.g. F60.208)" if st.session_state.lang == "🇬🇧 English" else "Название профиля (напр. F60.208)")
+    project_title = st.text_input(col_proj_label, key="project_title", on_change=reset_calculation)
+    st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+
     input_col1, input_col2, input_col3 = st.columns(3)
     with input_col1:
         raw_length = st.number_input(t("profile_len"), min_value=10, value=6000, on_change=reset_calculation)
@@ -617,11 +624,13 @@ with main_col2:
         
         st.info(t("used_prof_info", raw_length, raw_qty, waste_limit))
 
+        project_title_val = st.session_state.get("project_title", "")
+
         if run_advanced:
             p_col1, p_col2 = st.columns(2)
             
             with p_col1:
-                pdf_buffer_1 = create_visual_pdf(res1_details, raw_length, raw_qty, waste_limit, res1_total)
+                pdf_buffer_1 = create_visual_pdf(res1_details, raw_length, raw_qty, waste_limit, res1_total, project_title_val)
                 st.download_button(
                     label=t("pdf_m1"),
                     data=pdf_buffer_1,
@@ -632,7 +641,7 @@ with main_col2:
                 )
             
             with p_col2:
-                pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total)
+                pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total, project_title_val)
                 st.download_button(
                     label=t("pdf_m2"),
                     data=pdf_buffer_2,
@@ -642,7 +651,7 @@ with main_col2:
                     width='stretch'
                 )
         else:
-            pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total)
+            pdf_buffer_2 = create_visual_pdf(res2_details, raw_length, raw_qty, waste_limit, res2_total, project_title_val)
             st.download_button(
                 label=t("pdf_quick"),
                 data=pdf_buffer_2,
