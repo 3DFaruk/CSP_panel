@@ -51,9 +51,10 @@ def t(key, *args):
         return text.format(*args)
     return text
 
-def solve_cutting_stock_integer(data_list, raw_len):
-    L = raw_len
-    item_lengths = [item[0] for item in data_list]
+def solve_cutting_stock_integer(data_list, raw_len, kerf=0):
+    L = raw_len + kerf
+    item_lengths = [item[0] + kerf for item in data_list]
+    original_lengths = [item[0] for item in data_list]
     demands = [item[1] for item in data_list]
     descriptions = [item[2] if len(item) > 2 else "" for item in data_list]
     
@@ -113,7 +114,7 @@ def solve_cutting_stock_integer(data_list, raw_len):
             for idx, val in enumerate(patterns[j]):
                 if val > 0:
                     desc_str = f" ({descriptions[idx]})" if descriptions[idx] else ""
-                    pat_desc.append(f"{val}x {item_lengths[idx]}mm{desc_str}")
+                    pat_desc.append(f"{val}x {original_lengths[idx]}mm{desc_str}")
                     pat_len += val * item_lengths[idx]
             
             details.append({
@@ -125,13 +126,15 @@ def solve_cutting_stock_integer(data_list, raw_len):
             
     return total_used, details
 
-def solve_first_fit_decreasing(data_list, raw_len):
+def solve_first_fit_decreasing(data_list, raw_len, kerf=0):
+    L = raw_len + kerf
     all_items = []
     for item in data_list:
-        l = item[0]
+        l_eff = item[0] + kerf
+        l_orig = item[0]
         d = item[1]
         desc = item[2] if len(item) > 2 else ""
-        all_items.extend([(l, desc)] * d)
+        all_items.extend([(l_eff, l_orig, desc)] * d)
     
     all_items.sort(key=lambda x: x[0], reverse=True)
     
@@ -148,7 +151,7 @@ def solve_first_fit_decreasing(data_list, raw_len):
         
         if not placed:
             bins.append({
-                'remaining': raw_len - item[0],
+                'remaining': L - item[0],
                 'items': [item]
             })
     
@@ -157,7 +160,8 @@ def solve_first_fit_decreasing(data_list, raw_len):
     
     details = []
     for content, count in bin_counts.items():
-        item_counts = Counter(content)
+        orig_items = [(x[1], x[2]) for x in content]
+        item_counts = Counter(orig_items)
         pat_desc = [f"{c}x {l}mm ({desc})" if desc else f"{c}x {l}mm" for ((l, desc), c) in item_counts.items()]
         used_len = sum([x[0] for x in content])
         
@@ -165,7 +169,7 @@ def solve_first_fit_decreasing(data_list, raw_len):
             "count": count,
             "pattern_str": " + ".join(pat_desc),
             "used_len": used_len,
-            "waste": raw_len - used_len
+            "waste": L - used_len
         })
         
     return len(bins), details
@@ -529,11 +533,11 @@ with main_col2:
             st.error(t("empty_list"))
             st.stop()
 
-        eff_len = raw_length - waste_limit
+        eff_len = raw_length
         total_needed_len = sum(p[0] * p[1] for p in parca_listesi)
         
         t2 = time.time()
-        res2_total, res2_details = solve_first_fit_decreasing(parca_listesi, eff_len)
+        res2_total, res2_details = solve_first_fit_decreasing(parca_listesi, eff_len, kerf=waste_limit)
         d2 = time.time() - t2
         
         used2 = res2_total * eff_len
@@ -544,7 +548,7 @@ with main_col2:
         
         if run_advanced:
             t1 = time.time()
-            res1_total, res1_details = solve_cutting_stock_integer(parca_listesi, eff_len)
+            res1_total, res1_details = solve_cutting_stock_integer(parca_listesi, eff_len, kerf=waste_limit)
             d1 = time.time() - t1
             
             used1 = res1_total * eff_len
